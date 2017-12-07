@@ -39,3 +39,15 @@ let parsePrimitive<'T> (envVarName : string) : EnvParseResult<'T> =
   | Shape.String -> wrap parseString
   | Shape.Bool -> wrap parseBool
   | _ -> NotSupported "unknown target type"
+
+
+let parseRecord<'T> () =
+  match shapeof<'T> with
+  | Shape.FSharpRecord (:? ShapeFSharpRecord<'T> as shape) -> ()
+  | _ -> failwith "not supported"
+
+
+type ConnString = {
+  HostName : string
+  Port : int
+}
