@@ -1,0 +1,3 @@
+source https://www.nuget.org/api/v2
+
+github eiriktsarpalis/TypeShape:2.20 src/TypeShape/TypeShape.fs
