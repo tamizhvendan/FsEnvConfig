@@ -1,8 +1,9 @@
 #load "./paket-files/eiriktsarpalis/TypeShape/src/TypeShape/TypeShape.fs"
 open TypeShape
 open System
+open System.Text.RegularExpressions
 
-type EnvParseResult<'T> =
+type EnvVarParseResult<'T> =
 | Success of 'T
 | BadValue of (string * string)
 | NotFound of string
@@ -13,7 +14,7 @@ let getEnv name =
   let v = Environment.GetEnvironmentVariable name
   if v = null then None else Some v
 
-// (string -> bool * 'a) -> name ->  EnvParseResult<'a>
+// (string -> bool * 'a) -> name ->  EnvVarParseResult<'a>
 let tryParseWith tryParseFunc name = 
   match getEnv name with
   | None -> NotFound name
@@ -28,11 +29,11 @@ let parseBool = tryParseWith Boolean.TryParse
 let parseString = tryParseWith (fun s -> (true,s))
 
 
-// string -> EnvParseResult<'T>
-let parsePrimitive<'T> (envVarName : string) : EnvParseResult<'T> =
+// string -> EnvVarParseResult<'T>
+let parsePrimitive<'T> (envVarName : string) : EnvVarParseResult<'T> =
   let wrap(p : string -> 'a) = 
     envVarName
-    |> unbox<string -> EnvParseResult<'T>> p 
+    |> unbox<string -> EnvVarParseResult<'T>> p 
     
   match shapeof<'T> with
   | Shape.Int32 -> wrap parseInt
@@ -41,13 +42,29 @@ let parsePrimitive<'T> (envVarName : string) : EnvParseResult<'T> =
   | _ -> NotSupported "unknown target type"
 
 
+let envVarNameRegEx = 
+  Regex("([^A-Z]+|[A-Z][^A-Z]+|[A-Z]+)", RegexOptions.Compiled)
+
+let canonicalizeEnvVarName name =
+  let subStrings =
+    envVarNameRegEx.Matches name
+    |> Seq.cast
+    |> Seq.map (fun (m : Match) -> m.Value.ToUpperInvariant())
+    |> Seq.toArray
+  String.Join("_", subStrings)
+  
 let parseRecord<'T> () =
   match shapeof<'T> with
-  | Shape.FSharpRecord (:? ShapeFSharpRecord<'T> as shape) -> ()
+  | Shape.FSharpRecord (:? ShapeFSharpRecord<'T> as shape) -> 
+    shape.Fields
+    |> Seq.iter (fun f -> 
+      let envVarName = canonicalizeEnvVarName f.Label
+      printfn "%s, %s" envVarName f.Member.Type.Name)
   | _ -> failwith "not supported"
 
-
-type ConnString = {
-  HostName : string
+type Config = {
+  ConnectionString : string
   Port : int
+  EnableDebug : bool
+  Environment : string
 }
